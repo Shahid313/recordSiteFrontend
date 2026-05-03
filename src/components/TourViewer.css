@@ -1,0 +1,304 @@
+.tv-shell {
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 96px);
+  min-height: 520px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #0b1220;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tv-main {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.tv-fade .tv-pano-wrap {
+  opacity: 0.65;
+  transition: opacity 140ms ease;
+}
+
+.tv-pano-wrap {
+  position: absolute;
+  inset: 0;
+}
+
+.tv-pano {
+  width: 100%;
+  height: 100%;
+}
+
+.tv-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 15, 25, 0.45);
+  z-index: 30;
+  backdrop-filter: blur(4px);
+}
+
+.spinner {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: rgba(255, 255, 255, 0.9);
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tv-error {
+  position: absolute;
+  inset: 20px;
+  border-radius: 16px;
+  padding: 16px;
+  background: rgba(220, 38, 38, 0.14);
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  color: #fff;
+  z-index: 40;
+}
+
+.tv-controls {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.tv-ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  cursor: pointer;
+}
+
+.tv-ctl:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.tv-ctl-label {
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.tv-info {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.tv-info-text {
+  white-space: nowrap;
+}
+
+.tv-map-wrap {
+  position: absolute;
+  right: 16px;
+  bottom: 78px;
+  z-index: 60;
+}
+
+.tv-map-wrap-full {
+  left: 16px;
+  right: 16px;
+  top: 16px;
+  bottom: 78px;
+}
+
+.tv-map {
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+.tv-map-mini {
+  width: 320px;
+  max-width: calc(100vw - 32px);
+}
+
+.tv-map-full {
+  width: 100%;
+  height: 100%;
+}
+
+.tv-map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  color: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tv-map-title {
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+}
+
+.tv-map-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.tv-iconbtn {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+}
+
+.tv-iconbtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.tv-map-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.tv-pulse {
+  fill: rgba(79, 125, 175, 0.18);
+  stroke: rgba(79, 125, 175, 0.6);
+  stroke-width: 2;
+  animation: pulse 1.2s ease-out infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.65);
+  }
+  100% {
+    opacity: 0.05;
+    transform: scale(1.35);
+  }
+}
+
+/* Pannellum hotspots */
+.cv-hotspot {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 0 6px rgba(0, 0, 0, 0.15);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  cursor: pointer;
+}
+
+.cv-hotspot:hover {
+  transform: scale(1.18);
+  box-shadow: 0 0 0 10px rgba(0, 0, 0, 0.18);
+}
+
+.cv-hotspot-inner {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111827;
+  font-weight: 900;
+  font-size: 11px;
+  display: grid;
+  place-items: center;
+}
+
+.cv-hotspot-high {
+  background: rgba(79, 125, 175, 0.78);
+}
+
+.cv-hotspot-med {
+  background: rgba(245, 158, 11, 0.8);
+}
+
+.cv-hotspot-low {
+  background: rgba(220, 38, 38, 0.75);
+}
+
+@media (max-width: 640px) {
+  .tv-shell {
+    height: calc(100vh - 76px);
+    border-radius: 14px;
+  }
+
+  .tv-controls {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .tv-ctl {
+    height: 44px;
+    padding: 0 10px;
+  }
+
+  .tv-ctl-label {
+    font-size: 12px;
+  }
+
+  .tv-info {
+    width: 100%;
+    justify-content: center;
+    margin-left: 0;
+  }
+
+  /* Hide minimap by default on mobile; user can re-enable via button */
+  .tv-map-wrap {
+    right: 10px;
+    bottom: 86px;
+  }
+
+  .tv-map-mini {
+    width: 280px;
+  }
+}
+
+
