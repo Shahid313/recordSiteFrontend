@@ -35,6 +35,13 @@ const clr = {
   nodeModified: 'rgba(79,125,175,0.75)',
 };
 
+function panoramaUrlFromThumbnail(thumbnailUrl) {
+  if (!thumbnailUrl) return null;
+  return thumbnailUrl
+    .replace('/files/thumbnails/', '/files/panoramas/')
+    .replace('/thumbnails/', '/panoramas/');
+}
+
 /* ────────────────────────────────────────────────────── component */
 
 export const ConstellationEditor = ({ projectId, onClose, onSaved }) => {
@@ -222,7 +229,7 @@ export const ConstellationEditor = ({ projectId, onClose, onSaved }) => {
     }
   };
 
-  const onCanvasMouseUp = (e) => {
+  const onCanvasMouseUp = () => {
     if (panning) {
       setPanning(null);
       return;
@@ -689,7 +696,7 @@ export const ConstellationEditor = ({ projectId, onClose, onSaved }) => {
                 <div className="ce-panel-title">Edit Panorama #{panelNode.frame_number}</div>
                 {panelNode.thumbnail_url && (
                   <a
-                    href={panelNode.thumbnail_url.replace('/files/thumbnails/', '/files/panoramas/')}
+                    href={panoramaUrlFromThumbnail(panelNode.thumbnail_url)}
                     target="_blank"
                     rel="noreferrer"
                     title="Open full panorama"

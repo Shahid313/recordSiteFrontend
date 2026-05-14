@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Save, Eye, Grid3x3, Move, RotateCw, ZoomIn, ZoomOut, GripVertical } from 'lucide-react';
 import { floorplansAPI } from '../api/floorplans';
 import { constellationAPI } from '../api/constellation';
@@ -25,6 +25,13 @@ function inverseTransform(pixel, matrix) {
   return { x: rx / matrix.scale, y: ry / matrix.scale };
 }
 
+function panoramaUrlFromThumbnail(thumbnailUrl) {
+  if (!thumbnailUrl) return null;
+  return thumbnailUrl
+    .replace('/files/thumbnails/', '/files/panoramas/')
+    .replace('/thumbnails/', '/panoramas/');
+}
+
 /* ── component ── */
 
 export const FloorplanAligner = ({ projectId, floorplan, onSaved, onClose }) => {
@@ -43,7 +50,7 @@ export const FloorplanAligner = ({ projectId, floorplan, onSaved, onClose }) => 
 
   const [opacity, setOpacity] = useState(70);
   const [showGrid, setShowGrid] = useState(false);
-  const [showConnections, setShowConnections] = useState(true);
+  const showConnections = true;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -432,9 +439,7 @@ export const FloorplanAligner = ({ projectId, floorplan, onSaved, onClose }) => 
                 </div>
               );
             }
-            const fullUrl = selectedNode.thumbnail_url
-              ? selectedNode.thumbnail_url.replace('/files/thumbnails/', '/files/panoramas/')
-              : null;
+            const fullUrl = panoramaUrlFromThumbnail(selectedNode.thumbnail_url);
             return (
               <>
                 <div style={{ fontWeight: 900, color: '#fff', fontSize: 14 }}>Frame #{selectedNode.frame_number}</div>
