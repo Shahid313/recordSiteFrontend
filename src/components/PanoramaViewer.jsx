@@ -27,6 +27,8 @@ export const PanoramaViewer = ({
 }) => {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
+  const hotspotIdsRef = useRef([]);
+  const onViewerReadyRef = useRef(onViewerReady);
   const [isLoaded, setIsLoaded] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const panoramaImageUrl = useMemo(
@@ -34,9 +36,14 @@ export const PanoramaViewer = ({
     [panorama?.image_url],
   );
 
+  useEffect(() => {
+    onViewerReadyRef.current = onViewerReady;
+  }, [onViewerReady]);
+
   const navigationHotSpots = useMemo(() => {
     const list = panorama?.connected_panoramas || [];
     return list.map((c) => ({
+      id: `nav-${c.id}`,
       pitch: typeof c.pitch === 'number' ? c.pitch : 0,
       yaw: typeof c.yaw === 'number' ? c.yaw : typeof c.direction === 'number' ? c.direction : 0,
       cssClass: hotspotClassForConfidence(c.confidence),
@@ -49,6 +56,7 @@ export const PanoramaViewer = ({
 
   const commentHotSpots = useMemo(() => {
     return comments.map((comment) => ({
+      id: `comment-${comment.id}`,
       pitch: typeof comment.pitch === 'number' ? comment.pitch : 0,
       yaw: typeof comment.yaw === 'number' ? comment.yaw : 0,
       cssClass: `cv-comment-hotspot ${comment.resolved ? 'resolved' : ''}`,
@@ -106,8 +114,8 @@ export const PanoramaViewer = ({
         mouseZoom: true,
         keyboardZoom: true,
         draggable: true,
-        hotSpots,
-        autoRotate: autoRotate ? 1.2 : 0,
+        hotSpots: [],
+        autoRotate: false,
       });
 
       viewerRef.current = v;
@@ -117,12 +125,13 @@ export const PanoramaViewer = ({
       v.on('load', onLoad);
       v.on('error', onError);
 
-      onViewerReady?.(v);
+      onViewerReadyRef.current?.(v);
 
       return () => {
         try {
           v.off('load', onLoad);
           v.off('error', onError);
+          hotspotIdsRef.current = [];
           v.destroy();
         } catch {
           // ignore
@@ -132,7 +141,40 @@ export const PanoramaViewer = ({
       setLoadError(e?.message || 'Failed to initialize viewer.');
       return undefined;
     }
-  }, [panorama?.id, panoramaImageUrl, showControls, autoRotate, hotSpots, onViewerReady]);
+  }, [panorama?.id, panoramaImageUrl, showControls]);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer?.addHotSpot || !viewer?.removeHotSpot) return;
+
+    for (const id of hotspotIdsRef.current) {
+      try {
+        viewer.removeHotSpot(id);
+      } catch {
+        // ignore stale hot spots
+      }
+    }
+
+    hotspotIdsRef.current = [];
+    for (const hotSpot of hotSpots) {
+      try {
+        viewer.addHotSpot(hotSpot);
+        hotspotIdsRef.current.push(hotSpot.id);
+      } catch {
+        // ignore malformed hot spots
+      }
+    }
+  }, [hotSpots, isLoaded]);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    if (autoRotate) {
+      viewer.startAutoRotate?.(1.2);
+    } else {
+      viewer.stopAutoRotate?.();
+    }
+  }, [autoRotate]);
 
   return (
     <div className="tv-pano-wrap">

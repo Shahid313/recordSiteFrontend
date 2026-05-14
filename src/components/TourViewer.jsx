@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toursAPI } from '../api/tours';
 import { PanoramaViewer } from './PanoramaViewer';
 import { ConstellationViewer } from './ConstellationViewer';
@@ -89,7 +89,7 @@ export const TourViewer = ({ projectId, tourData, onExit }) => {
     setVisited(startPanoId ? [startPanoId] : []);
   }, [projectId, startPanoId]);
 
-  const loadComments = async () => {
+  const loadComments = useCallback(async () => {
     try {
       const rows = await collaborationAPI.listComments(projectId);
       setComments(rows);
@@ -97,14 +97,14 @@ export const TourViewer = ({ projectId, tourData, onExit }) => {
     } catch (e) {
       setCommentsError(e?.response?.data?.detail || 'Failed to load comments.');
     }
-  };
+  }, [projectId]);
 
   useEffect(() => {
     if (!projectId) return undefined;
     loadComments();
     const timer = setInterval(loadComments, 5000);
     return () => clearInterval(timer);
-  }, [projectId]);
+  }, [projectId, loadComments]);
 
   const idx = useMemo(() => ordered.findIndex((p) => p.id === currentPanoId), [ordered, currentPanoId]);
   const prevId = idx > 0 ? ordered[idx - 1].id : null;
