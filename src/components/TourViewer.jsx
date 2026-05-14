@@ -6,6 +6,7 @@ import { FloorplanViewer } from './FloorplanViewer';
 import { FloorSwitcher } from './FloorSwitcher';
 import { NavigationControls } from './NavigationControls';
 import { ConstellationEditor } from './ConstellationEditor';
+import { collaborationAPI } from '../api/collaboration';
 import './TourViewer.css';
 
 const isMobile = () => (typeof window !== 'undefined' ? window.matchMedia?.('(max-width: 640px)')?.matches : false);
@@ -24,6 +25,8 @@ export const TourViewer = ({ projectId, tourData, onExit }) => {
 
   const startPanoId = tourData?.metadata?.start_pano_id || (ordered[0]?.id ?? null);
   const total = tourData?.metadata?.total || ordered.length || 0;
+  const accessRole = tourData?.metadata?.access_role || 'viewer';
+  const canResolveComments = accessRole === 'editor';
 
   const [currentPanoId, setCurrentPanoId] = useState(startPanoId);
   const [currentDetails, setCurrentDetails] = useState(null);
@@ -35,6 +38,10 @@ export const TourViewer = ({ projectId, tourData, onExit }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fade, setFade] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [commentsError, setCommentsError] = useState(null);
+  const [commentMode, setCommentMode] = useState(false);
+  const [selectedCommentId, setSelectedCommentId] = useState(null);
 
   /* floorplan support */
   const floorplans = useMemo(() => tourData?.floorplans || [], [tourData]);
@@ -51,6 +58,16 @@ export const TourViewer = ({ projectId, tourData, onExit }) => {
   const activeFloorplan = useMemo(
     () => floorplans.find((f) => f.id === selectedFloorId) || floorplans[0] || null,
     [floorplans, selectedFloorId],
+  );
+
+  const currentComments = useMemo(
+    () => comments.filter((comment) => comment.panorama_id === currentPanoId),
+    [comments, currentPanoId],
+  );
+
+  const selectedComment = useMemo(
+    () => comments.find((comment) => comment.id === selectedCommentId) || null,
+    [comments, selectedCommentId],
   );
 
   /* filter panoramas for current floor */
@@ -71,6 +88,23 @@ export const TourViewer = ({ projectId, tourData, onExit }) => {
     setCurrentPanoId(startPanoId);
     setVisited(startPanoId ? [startPanoId] : []);
   }, [projectId, startPanoId]);
+
+  const loadComments = async () => {
+    try {
+      const rows = await collaborationAPI.listComments(projectId);
+      setComments(rows);
+      setCommentsError(null);
+    } catch (e) {
+      setCommentsError(e?.response?.data?.detail || 'Failed to load comments.');
+    }
+  };
+
+  useEffect(() => {
+    if (!projectId) return undefined;
+    loadComments();
+    const timer = setInterval(loadComments, 5000);
+    return () => clearInterval(timer);
+  }, [projectId]);
 
   const idx = useMemo(() => ordered.findIndex((p) => p.id === currentPanoId), [ordered, currentPanoId]);
   const prevId = idx > 0 ? ordered[idx - 1].id : null;
@@ -98,6 +132,37 @@ export const TourViewer = ({ projectId, tourData, onExit }) => {
       setVisited((v) => (v.includes(newId) ? v : [...v, newId]));
       setFade(false);
     }, 140);
+  };
+
+  const createCommentAt = async ({ yaw, pitch }) => {
+    if (!currentPanoId) return;
+    const body = window.prompt('Add a comment for this marker');
+    if (!body?.trim()) return;
+    try {
+      const created = await collaborationAPI.createComment(projectId, {
+        panorama_id: currentPanoId,
+        body: body.trim(),
+        yaw,
+        pitch,
+      });
+      setComments((prev) => [...prev.filter((comment) => comment.id !== created.id), created]);
+      setSelectedCommentId(created.id);
+      setCommentMode(false);
+      setCommentsError(null);
+    } catch (e) {
+      setCommentsError(e?.response?.data?.detail || 'Failed to create comment.');
+    }
+  };
+
+  const toggleResolved = async (comment) => {
+    if (!comment || !canResolveComments) return;
+    try {
+      const updated = await collaborationAPI.setResolved(comment.id, !comment.resolved);
+      setComments((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      setCommentsError(null);
+    } catch (e) {
+      setCommentsError(e?.response?.data?.detail || 'Failed to update comment.');
+    }
   };
 
   useEffect(() => {
@@ -205,6 +270,10 @@ export const TourViewer = ({ projectId, tourData, onExit }) => {
             onNavigate={(id) => navigateTo(id)}
             showControls
             autoRotate={isAutoRotate}
+            comments={currentComments}
+            commentMode={commentMode}
+            onCreateComment={createCommentAt}
+            onSelectComment={setSelectedCommentId}
             onViewerReady={(v) => {
               viewerInstanceRef.current = v;
             }}
@@ -234,6 +303,58 @@ export const TourViewer = ({ projectId, tourData, onExit }) => {
             />
           </div>
         )}
+
+        <div className="tv-comments-panel">
+          <div className="tv-comments-head">
+            <div>
+              <div className="tv-comments-title">Comments</div>
+              <div className="tv-comments-meta">{currentComments.length} on this panorama</div>
+            </div>
+            <button
+              className={`tv-ctl tv-comment-add ${commentMode ? 'active' : ''}`}
+              onClick={() => setCommentMode((v) => !v)}
+              title="Place a comment marker"
+            >
+              {commentMode ? 'Cancel' : 'Add marker'}
+            </button>
+          </div>
+          {commentMode && <div className="tv-comments-hint">Click anywhere in the panorama to place the marker.</div>}
+          {commentsError && <div className="tv-comments-error">{commentsError}</div>}
+          <div className="tv-comments-list">
+            {currentComments.length === 0 ? (
+              <div className="tv-comments-empty">No comments here yet.</div>
+            ) : (
+              currentComments.map((comment) => (
+                <button
+                  key={comment.id}
+                  className={`tv-comment-row ${comment.id === selectedCommentId ? 'active' : ''} ${comment.resolved ? 'resolved' : ''}`}
+                  onClick={() => setSelectedCommentId(comment.id)}
+                >
+                  <div className="tv-comment-body">{comment.body}</div>
+                  <div className="tv-comment-meta">
+                    {comment.author?.name || 'Unknown'} - {comment.resolved ? 'Resolved' : 'Open'}
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+          {selectedComment && (
+            <div className="tv-comment-detail">
+              <div className="tv-comment-body">{selectedComment.body}</div>
+              <div className="tv-comment-meta">
+                {selectedComment.author?.name || 'Unknown'} - {new Date(selectedComment.created_at).toLocaleString()}
+              </div>
+              <button
+                className="tv-ctl"
+                disabled={!canResolveComments}
+                onClick={() => toggleResolved(selectedComment)}
+                title={canResolveComments ? 'Resolve or reopen this comment' : 'Viewer role cannot resolve comments'}
+              >
+                {selectedComment.resolved ? 'Reopen' : 'Resolve'}
+              </button>
+            </div>
+          )}
+        </div>
 
         {showMinimap && (
           <div className={mapMode === 'full' ? 'tv-map-wrap tv-map-wrap-full' : 'tv-map-wrap'}>

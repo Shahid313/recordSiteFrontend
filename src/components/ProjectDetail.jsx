@@ -9,6 +9,8 @@ import { ConstellationEditor } from './ConstellationEditor';
 import { FloorplanUpload } from './FloorplanUpload';
 import { FloorplanAligner } from './FloorplanAligner';
 import { floorplansAPI } from '../api/floorplans';
+import { collaborationAPI } from '../api/collaboration';
+import { useAuth } from '../context/AuthContext';
 
 const IN_FLIGHT_STATUSES = new Set(['UPLOADED', 'EXTRACTING_FRAMES', 'PROCESSING_SFM']);
 
@@ -26,6 +28,7 @@ export const ProjectDetail = () => {
   const { id } = useParams();
   const projectId = Number(id);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [project, setProject] = useState(null);
   const [videos, setVideos] = useState([]);
@@ -39,6 +42,10 @@ export const ProjectDetail = () => {
   const [isDeletingProject, setIsDeletingProject] = useState(false);
   const [floorplans, setFloorplans] = useState([]);
   const [aligningFp, setAligningFp] = useState(null);
+  const [collaborators, setCollaborators] = useState(null);
+  const [collabEmail, setCollabEmail] = useState('');
+  const [collabRole, setCollabRole] = useState('viewer');
+  const [collabError, setCollabError] = useState(null);
 
   const selectedVideoIdRef = useRef(null);
 
@@ -50,6 +57,8 @@ export const ProjectDetail = () => {
     () => videos.find((v) => v.id === selectedVideoId) || null,
     [videos, selectedVideoId]
   );
+  const canEditProject = project?.access_role === 'editor';
+  const isProjectOwner = project?.owner_id === user?.id || user?.is_superuser;
 
   const load = async () => {
     setError(null);
@@ -60,6 +69,12 @@ export const ProjectDetail = () => {
       const v = await projectsAPI.listVideos(projectId);
       setVideos(v);
       if (!selectedVideoId && v.length > 0) setSelectedVideoId(v[0].id);
+      if (p.owner_id === user?.id || user?.is_superuser) {
+        try {
+          const c = await collaborationAPI.listCollaborators(projectId);
+          setCollaborators(c);
+        } catch { /* non-fatal */ }
+      }
     } catch (err) {
       setError(err?.response?.data?.detail || 'Failed to load project.');
     } finally {
@@ -250,6 +265,46 @@ export const ProjectDetail = () => {
     }
   };
 
+  const loadCollaborators = async () => {
+    if (!isProjectOwner) return;
+    try {
+      const data = await collaborationAPI.listCollaborators(projectId);
+      setCollaborators(data);
+      setCollabError(null);
+    } catch (err) {
+      setCollabError(err?.response?.data?.detail || 'Failed to load collaborators.');
+    }
+  };
+
+  const addCollaborator = async () => {
+    if (!collabEmail.trim()) return;
+    try {
+      await collaborationAPI.addCollaborator(projectId, { email: collabEmail.trim(), role: collabRole });
+      setCollabEmail('');
+      await loadCollaborators();
+    } catch (err) {
+      setCollabError(err?.response?.data?.detail || 'Failed to add collaborator.');
+    }
+  };
+
+  const updateCollaboratorRole = async (collaboratorId, role) => {
+    try {
+      await collaborationAPI.updateCollaborator(projectId, collaboratorId, { role });
+      await loadCollaborators();
+    } catch (err) {
+      setCollabError(err?.response?.data?.detail || 'Failed to update collaborator.');
+    }
+  };
+
+  const removeCollaborator = async (collaboratorId) => {
+    try {
+      await collaborationAPI.removeCollaborator(projectId, collaboratorId);
+      await loadCollaborators();
+    } catch (err) {
+      setCollabError(err?.response?.data?.detail || 'Failed to remove collaborator.');
+    }
+  };
+
   if (!Number.isFinite(projectId)) {
     return <div className="container">Invalid project id.</div>;
   }
@@ -296,6 +351,7 @@ export const ProjectDetail = () => {
                       onClick={handleDeleteProject}
                       className="btn btn-danger"
                       disabled={isDeletingProject}
+                      style={{ display: isProjectOwner ? undefined : 'none' }}
                     >
                       {isDeletingProject ? 'Deleting…' : 'Delete Project'}
                     </button>
@@ -321,6 +377,7 @@ export const ProjectDetail = () => {
                 </button>
                 <button
                   className={`tab-btn ${tab === 'editor' ? 'active' : ''}`}
+                  style={{ display: canEditProject ? undefined : 'none' }}
                   onClick={async () => {
                     setTab('editor');
                     await loadConstellation();
@@ -330,16 +387,28 @@ export const ProjectDetail = () => {
                 </button>
                 <button
                   className={`tab-btn ${tab === 'floorplans' ? 'active' : ''}`}
+                  style={{ display: canEditProject ? undefined : 'none' }}
                   onClick={() => setTab('floorplans')}
                 >
                   Floorplans
                 </button>
+                {isProjectOwner && (
+                  <button
+                    className={`tab-btn ${tab === 'collaboration' ? 'active' : ''}`}
+                    onClick={() => {
+                      setTab('collaboration');
+                      loadCollaborators();
+                    }}
+                  >
+                    Collaboration
+                  </button>
+                )}
               </div>
             </div>
           </div>
 
           <div className="pd-grid" style={{ marginTop: 16 }}>
-            <div className="card">
+            <div className="card" style={{ display: canEditProject ? undefined : 'none' }}>
               <div className="card-inner">
                 <div className="section-head">
                   <h2 className="section-title">Upload Video</h2>
@@ -381,9 +450,10 @@ export const ProjectDetail = () => {
                           </div>
                           <button
                             className="btn btn-danger"
-                            style={{ padding: '7px 10px', borderRadius: 12 }}
+                            style={{ padding: '7px 10px', borderRadius: 12, display: canEditProject ? undefined : 'none' }}
                             onClick={(e) => handleDeleteVideo(e, v.id)}
                             title="Delete video"
+                            disabled={!canEditProject}
                           >
                             Delete
                           </button>
@@ -434,6 +504,49 @@ export const ProjectDetail = () => {
                   )}
                 </>
               )}
+            </div>
+          </div>
+          ) : tab === 'collaboration' ? (
+          <div className="card" style={{ marginTop: 16 }}>
+            <div className="card-inner">
+              <h2 style={{ margin: '0 0 14px 0' }}>Collaboration</h2>
+              {collabError && <div className="error" style={{ marginBottom: 12 }}>{collabError}</div>}
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) 160px auto', gap: 10, alignItems: 'end' }}>
+                <label>
+                  <span className="label">User email</span>
+                  <input className="input" value={collabEmail} onChange={(e) => setCollabEmail(e.target.value)} placeholder="teammate@example.com" />
+                </label>
+                <label>
+                  <span className="label">Role</span>
+                  <select value={collabRole} onChange={(e) => setCollabRole(e.target.value)}>
+                    <option value="viewer">Viewer</option>
+                    <option value="editor">Editor</option>
+                  </select>
+                </label>
+                <button className="btn btn-primary" onClick={addCollaborator}>Add</button>
+              </div>
+              <div className="divider" />
+              <div className="pd-videos">
+                {collaborators?.collaborators?.length ? collaborators.collaborators.map((collab) => (
+                  <div key={collab.id} className="pd-video-row" style={{ cursor: 'default' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div>
+                        <div style={{ fontWeight: 900 }}>{collab.user?.name || collab.user?.email}</div>
+                        <div className="muted" style={{ fontSize: 12 }}>{collab.user?.email}</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <select value={collab.role} onChange={(e) => updateCollaboratorRole(collab.id, e.target.value)} style={{ width: 130 }}>
+                          <option value="viewer">Viewer</option>
+                          <option value="editor">Editor</option>
+                        </select>
+                        <button className="btn btn-danger" onClick={() => removeCollaborator(collab.id)}>Remove</button>
+                      </div>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="muted">No collaborators yet.</div>
+                )}
+              </div>
             </div>
           </div>
           ) : tab === 'panoramas' ? (
@@ -492,7 +605,7 @@ export const ProjectDetail = () => {
                   <ConstellationView
                     nodes={constellation.nodes}
                     connections={constellation.connections || []}
-                    onSelectNode={(n) => {
+                    onSelectNode={() => {
                       // Jump to panoramas tab and show the selected panorama's video
                       setTab('panoramas');
                       setSelectedVideoId(constellation.video_id);

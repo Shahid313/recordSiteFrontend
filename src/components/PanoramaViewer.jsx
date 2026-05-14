@@ -20,6 +20,10 @@ export const PanoramaViewer = ({
   showControls = true,
   autoRotate = false,
   onViewerReady,
+  comments = [],
+  commentMode = false,
+  onCreateComment,
+  onSelectComment,
 }) => {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
@@ -30,7 +34,7 @@ export const PanoramaViewer = ({
     [panorama?.image_url],
   );
 
-  const hotSpots = useMemo(() => {
+  const navigationHotSpots = useMemo(() => {
     const list = panorama?.connected_panoramas || [];
     return list.map((c) => ({
       pitch: typeof c.pitch === 'number' ? c.pitch : 0,
@@ -42,6 +46,33 @@ export const PanoramaViewer = ({
       clickHandlerFunc: () => onNavigate?.(c.id),
     }));
   }, [panorama, onNavigate]);
+
+  const commentHotSpots = useMemo(() => {
+    return comments.map((comment) => ({
+      pitch: typeof comment.pitch === 'number' ? comment.pitch : 0,
+      yaw: typeof comment.yaw === 'number' ? comment.yaw : 0,
+      cssClass: `cv-comment-hotspot ${comment.resolved ? 'resolved' : ''}`,
+      createTooltipFunc: (hotSpotDiv) => {
+        hotSpotDiv.innerHTML = `<div class="cv-comment-dot">${comment.resolved ? 'OK' : '!'}</div>`;
+        hotSpotDiv.title = comment.body || 'Comment';
+      },
+      clickHandlerFunc: () => onSelectComment?.(comment.id),
+    }));
+  }, [comments, onSelectComment]);
+
+  const hotSpots = useMemo(
+    () => [...navigationHotSpots, ...commentHotSpots],
+    [navigationHotSpots, commentHotSpots],
+  );
+
+  const handlePanoramaClick = (event) => {
+    if (!commentMode || !viewerRef.current?.mouseEventToCoords) return;
+    if (event.target?.closest?.('.pnlm-hotspot')) return;
+
+    const coords = viewerRef.current.mouseEventToCoords(event);
+    if (!coords) return;
+    onCreateComment?.({ pitch: coords[0], yaw: coords[1] });
+  };
 
   useEffect(() => {
     setLoadError(null);
@@ -105,7 +136,11 @@ export const PanoramaViewer = ({
 
   return (
     <div className="tv-pano-wrap">
-      <div ref={containerRef} className="tv-pano" />
+      <div
+        ref={containerRef}
+        className={`tv-pano ${commentMode ? 'tv-pano-commenting' : ''}`}
+        onClickCapture={handlePanoramaClick}
+      />
       {!isLoaded && !loadError && (
         <div className="tv-loading">
           <div className="spinner" />
