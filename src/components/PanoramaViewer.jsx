@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import 'pannellum/build/pannellum.css';
 import 'pannellum/build/pannellum.js';
+import { getApiFileProxyUrl } from '../api/auth';
 
 const getPannellumViewer = () => {
   return typeof window !== 'undefined' ? window.pannellum?.viewer : undefined;
@@ -24,6 +25,10 @@ export const PanoramaViewer = ({
   const viewerRef = useRef(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [loadError, setLoadError] = useState(null);
+  const panoramaImageUrl = useMemo(
+    () => getApiFileProxyUrl(panorama?.image_url),
+    [panorama?.image_url],
+  );
 
   const hotSpots = useMemo(() => {
     const list = panorama?.connected_panoramas || [];
@@ -42,7 +47,7 @@ export const PanoramaViewer = ({
     setLoadError(null);
     setIsLoaded(false);
 
-    if (!containerRef.current || !panorama?.image_url) return undefined;
+    if (!containerRef.current || !panoramaImageUrl) return undefined;
 
     // Reset any previous instance
     try {
@@ -63,7 +68,8 @@ export const PanoramaViewer = ({
 
       const v = viewerFactory(el, {
         type: 'equirectangular',
-        panorama: panorama.image_url,
+        panorama: panoramaImageUrl,
+        crossOrigin: 'use-credentials',
         autoLoad: true,
         showControls: !!showControls,
         mouseZoom: true,
@@ -95,7 +101,7 @@ export const PanoramaViewer = ({
       setLoadError(e?.message || 'Failed to initialize viewer.');
       return undefined;
     }
-  }, [panorama?.id, panorama?.image_url, showControls, autoRotate, hotSpots, onViewerReady]);
+  }, [panorama?.id, panoramaImageUrl, showControls, autoRotate, hotSpots, onViewerReady]);
 
   return (
     <div className="tv-pano-wrap">

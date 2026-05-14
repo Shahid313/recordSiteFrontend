@@ -21,6 +21,20 @@ const toPublicFileUrl = (value) => {
   return `${PUBLIC_DEVELOPMENT_URL}/${match[1]}`;
 };
 
+export const getApiFileProxyUrl = (value) => {
+  if (!value || typeof value !== 'string') return value;
+
+  const publicPrefix = PUBLIC_DEVELOPMENT_URL ? `${PUBLIC_DEVELOPMENT_URL}/` : '';
+  const publicPath = publicPrefix && value.startsWith(publicPrefix)
+    ? value.slice(publicPrefix.length)
+    : null;
+  const apiPath = value.match(FILE_ROUTE_PATTERN)?.[1] || publicPath;
+
+  if (!apiPath) return value;
+
+  return `${API_URL}/files/${apiPath}?proxy=1`;
+};
+
 const normalizeFileUrls = (value) => {
   if (Array.isArray(value)) return value.map(normalizeFileUrls);
   if (!value || typeof value !== 'object') return toPublicFileUrl(value);
