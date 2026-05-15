@@ -7,6 +7,7 @@ import { FloorSwitcher } from './FloorSwitcher';
 import { NavigationControls } from './NavigationControls';
 import { ConstellationEditor } from './ConstellationEditor';
 import { collaborationAPI } from '../api/collaboration';
+import { getApiFileProxyUrl } from '../api/auth';
 import './TourViewer.css';
 
 const isMobile = () => (typeof window !== 'undefined' ? window.matchMedia?.('(max-width: 640px)')?.matches : false);
@@ -15,6 +16,7 @@ export const TourViewer = ({ projectId, tourData, onExit }) => {
   const containerRef = useRef(null);
   const viewerInstanceRef = useRef(null);
   const cacheRef = useRef(new Map()); // panoId -> details
+  const prefetchRef = useRef(new Set());
 
   const ordered = useMemo(() => {
     const list = tourData?.panoramas || [];
@@ -116,6 +118,21 @@ export const TourViewer = ({ projectId, tourData, onExit }) => {
     img.src = url;
   };
 
+  const preloadViewerImage = useCallback((url) => {
+    if (!url) return;
+    const proxyUrl = getApiFileProxyUrl(url);
+    if (!proxyUrl || prefetchRef.current.has(proxyUrl)) return;
+    prefetchRef.current.add(proxyUrl);
+    fetch(proxyUrl, { credentials: 'include', cache: 'force-cache' })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Preload failed: ${res.status}`);
+        return res.blob();
+      })
+      .catch(() => {
+        prefetchRef.current.delete(proxyUrl);
+      });
+  }, []);
+
   const loadDetails = async (panoId) => {
     if (!panoId) return null;
     if (cacheRef.current.has(panoId)) return cacheRef.current.get(panoId);
@@ -173,6 +190,14 @@ export const TourViewer = ({ projectId, tourData, onExit }) => {
         return;
       }
       try {
+        const quick = panoById.get(currentPanoId);
+        if (quick) {
+          setCurrentDetails((prev) => (
+            prev?.id === quick.id
+              ? prev
+              : { ...quick, connected_panoramas: [] }
+          ));
+        }
         const d = await loadDetails(currentPanoId);
         if (!cancelled) setCurrentDetails(d);
         // Preload sequential neighbors
@@ -180,6 +205,8 @@ export const TourViewer = ({ projectId, tourData, onExit }) => {
         const pNext = nextId ? panoById.get(nextId) : null;
         preloadImage(pPrev?.image_url);
         preloadImage(pNext?.image_url);
+        preloadViewerImage(pPrev?.image_url);
+        preloadViewerImage(pNext?.image_url);
         if (prevId) loadDetails(prevId).catch(() => {});
         if (nextId) loadDetails(nextId).catch(() => {});
       } catch (e) {
@@ -190,7 +217,7 @@ export const TourViewer = ({ projectId, tourData, onExit }) => {
     return () => {
       cancelled = true;
     };
-  }, [currentPanoId, prevId, nextId, panoById]);
+  }, [currentPanoId, prevId, nextId, panoById, preloadViewerImage]);
 
   // Fullscreen state sync
   useEffect(() => {
