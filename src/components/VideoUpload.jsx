@@ -30,6 +30,18 @@ const formatStatus = (s) => STATUS_LABELS[s] || s || 'Unknown';
 const isProcessingStatus = (s) =>
   s === 'EXTRACTING_FRAMES' || s === 'PROCESSING_SFM' || s === 'UPLOADED';
 
+const uploadErrorMessage = (err) => {
+  const detail = err?.response?.data?.detail;
+  if (detail) return detail;
+  if (err?.code === 'ERR_NETWORK') {
+    return 'Upload failed because the network connection was interrupted. Please retry.';
+  }
+  if (err?.code === 'ECONNABORTED') {
+    return 'Upload timed out before the server responded. Please retry.';
+  }
+  return err?.message || 'Upload failed.';
+};
+
 export const VideoUpload = ({ projectId, onUploaded, onStatus, onCompleted, onFailed }) => {
   const inputRef = useRef(null);
   const [file, setFile] = useState(null);
@@ -109,7 +121,7 @@ export const VideoUpload = ({ projectId, onUploaded, onStatus, onCompleted, onFa
       setVideoId(res.video_id);
       onUploaded?.(res.video_id);
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Upload failed.');
+      setError(uploadErrorMessage(err));
     } finally {
       setIsUploading(false);
     }
