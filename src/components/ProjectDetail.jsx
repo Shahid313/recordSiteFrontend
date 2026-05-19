@@ -40,6 +40,7 @@ export const ProjectDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isDeletingProject, setIsDeletingProject] = useState(false);
+  const [deletingVideoIds, setDeletingVideoIds] = useState(() => new Set());
   const [floorplans, setFloorplans] = useState([]);
   const [aligningFp, setAligningFp] = useState(null);
   const [collaborators, setCollaborators] = useState(null);
@@ -237,8 +238,9 @@ export const ProjectDetail = () => {
 
   const handleDeleteProject = async () => {
     const ok = window.confirm('Delete this project? This will delete all videos and panoramas in it.');
-    if (!ok) return;
+    if (!ok || isDeletingProject) return;
     setIsDeletingProject(true);
+    setError(null);
     try {
       await projectsAPI.remove(projectId);
       navigate('/projects');
@@ -250,18 +252,37 @@ export const ProjectDetail = () => {
   };
 
   const handleDeleteVideo = async (e, videoId) => {
+    e.preventDefault();
     e.stopPropagation();
+    if (deletingVideoIds.has(videoId)) return;
     const ok = window.confirm('Delete this video and all extracted panoramas?');
     if (!ok) return;
+    const previousVideos = videos;
+    const previousPanoramas = panoramas;
+    const previousSelectedVideoId = selectedVideoId;
     try {
-      await videosAPI.remove(videoId);
-      await load();
+      setError(null);
+      setDeletingVideoIds((prev) => new Set(prev).add(videoId));
+      const nextVideos = videos.filter((v) => v.id !== videoId);
+      setVideos(nextVideos);
       if (selectedVideoId === videoId) {
-        setSelectedVideoId(null);
+        const nextSelected = nextVideos[0]?.id ?? null;
+        setSelectedVideoId(nextSelected);
         setPanoramas([]);
       }
+      await videosAPI.remove(videoId);
+      await refreshVideosOnly();
     } catch (err) {
+      setVideos(previousVideos);
+      setPanoramas(previousPanoramas);
+      setSelectedVideoId(previousSelectedVideoId);
       setError(err?.response?.data?.detail || 'Failed to delete video.');
+    } finally {
+      setDeletingVideoIds((prev) => {
+        const next = new Set(prev);
+        next.delete(videoId);
+        return next;
+      });
     }
   };
 
@@ -433,10 +454,18 @@ export const ProjectDetail = () => {
                 ) : (
                   <div className="pd-videos">
                     {videos.map((v) => (
-                      <button
+                      <div
                         key={v.id}
                         className={`pd-video-row ${v.id === selectedVideoId ? 'active' : ''}`}
                         onClick={() => setSelectedVideoId(v.id)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedVideoId(v.id);
+                          }
+                        }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
                           <div style={{ minWidth: 0 }}>
@@ -453,12 +482,12 @@ export const ProjectDetail = () => {
                             style={{ padding: '7px 10px', borderRadius: 12, display: canEditProject ? undefined : 'none' }}
                             onClick={(e) => handleDeleteVideo(e, v.id)}
                             title="Delete video"
-                            disabled={!canEditProject}
+                            disabled={!canEditProject || deletingVideoIds.has(v.id)}
                           >
-                            Delete
+                            {deletingVideoIds.has(v.id) ? 'Deleting...' : 'Delete'}
                           </button>
                         </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 )}
